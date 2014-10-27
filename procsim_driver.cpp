@@ -13,7 +13,7 @@ void print_help_and_exit(void) {
     printf("  -k k1\t\tNumber of k1 FUs\n");
     printf("  -l k2\t\tNumber of k2 FUs\n");   
     printf("  -f N\t\tNumber of instructions to fetch\n");
-    printf("  -r R\t\tROB Size\n");
+    printf("  -r R\t\tNumber of result buses\n");
     printf("  -i traces/file.trace\n");
     printf("  -h\t\tThis helpful output\n");
     exit(0);
