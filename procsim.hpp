@@ -16,6 +16,7 @@ typedef struct _proc_inst_t
     int32_t op_code;
     int32_t src_reg[2];
     int32_t dest_reg;
+    uint32_t tag;
     
     // You may introduce other fields as needed
     
