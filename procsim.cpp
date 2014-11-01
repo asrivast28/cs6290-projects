@@ -36,8 +36,8 @@ static uint64_t scheduling_queue_capacity = 0;
 
 static std::vector<result_bus_t> result_buses;
 static std::queue<proc_inst_t> dispatch_queue;
-static std::vector<std::pair<reservation_station_t, bool> > scheduling_queue;
-static std::vector<reservation_station_t*> scoreboard[FUNCTIONAL_UNIT_RANGE];
+static std::map<uint32_t, std::pair<reservation_station_t, bool> > scheduling_queue;
+static std::vector<int32_t> scoreboard[FUNCTIONAL_UNIT_RANGE];
 
 static std::pair<bool, uint32_t> reg_file[NUM_REGISTERS];
 
@@ -60,13 +60,13 @@ void setup_proc(uint64_t r, uint64_t k0, uint64_t k1, uint64_t k2, uint64_t f)
   }
 
   for (uint64_t i = 0; i < k0; ++i) {
-    scoreboard[0].push_back(0);
+    scoreboard[0].push_back(-1);
   }
   for (uint64_t i = 0; i < k1; ++i) {
-    scoreboard[1].push_back(0);
+    scoreboard[1].push_back(-1);
   }
   for (uint64_t i = 0; i < k2; ++i) {
-    scoreboard[2].push_back(0);
+    scoreboard[2].push_back(-1);
   }
 
   scheduling_queue_capacity = 2 * (k0 + k1 + k2);
@@ -85,7 +85,7 @@ static void fetch(proc_stats_t* p_stats)
     if (read_instruction(&p_inst)) {
       p_inst.tag = counter++;
       dispatch_queue.push(p_inst);
-      std::cerr << "FETCHED " << p_inst.tag << std::endl;
+      std::cerr << p_stats->cycle_count << " FETCHED " << (p_inst.tag + 1) << std::endl;
     }
     else {
       done_fetching = true;
@@ -99,7 +99,7 @@ static void fetch(proc_stats_t* p_stats)
   }
 }
 
-static void dispatch()
+static void dispatch(proc_stats_t* p_stats)
 {
   while ((scheduling_queue.size() < scheduling_queue_capacity) && (dispatch_queue.size() > 0)) {
     reservation_station_t rs;
@@ -121,9 +121,9 @@ static void dispatch()
     }
     rs.dest_reg_tag = p_inst.tag;
 
-    scheduling_queue.push_back(std::make_pair(rs, false));
+    scheduling_queue.insert(std::make_pair(rs.dest_reg_tag, std::make_pair(rs, false)));
     dispatch_queue.pop();
-    std::cerr << "DISPATCHED " << p_inst.tag << std::endl;
+    std::cerr << p_stats->cycle_count << " DISPATCHED " << (p_inst.tag + 1) << std::endl;
   }
 }
 
@@ -132,82 +132,87 @@ static bool compare_tags(const reservation_station_t& rs1, const reservation_sta
   return (rs1.dest_reg_tag < rs2.dest_reg_tag);
 }
 
-static void schedule()
+static void schedule(proc_stats_t* p_stats)
 {
   // Sort the scheduling queue so that instructions with lower tag values are fired first.
   // XXX: This will probably happen automatically.
   // std::sort(scheduling_queue.begin(), scheduling_queue.end(), compare_tags);
 
-  for (std::vector<std::pair<reservation_station_t, bool> >::iterator rs = scheduling_queue.begin(); rs != scheduling_queue.end(); ++rs) {
+  for (std::map<uint32_t, std::pair<reservation_station_t, bool> >::iterator qe = scheduling_queue.begin(); qe != scheduling_queue.end(); ++qe) {
+    std::pair<reservation_station_t, bool>& rs = qe->second;
+    if (rs.second) {
+      continue;
+    }
     for (std::vector<result_bus_t>::const_iterator cdb = result_buses.begin(); cdb != result_buses.end(); ++cdb) {
       for (int32_t i = 0; i < 2; ++i) {
-        if (cdb->tag == rs->first.src_reg_tag[i]) {
-          rs->first.src_reg_ready[i] = true;
+        if (cdb->tag == rs.first.src_reg_tag[i]) {
+          rs.first.src_reg_ready[i] = true;
         }
       }
     }
-    if (!rs->second && rs->first.src_reg_ready[0] && rs->first.src_reg_ready[1]) {
-      int32_t op_code = (rs->first.op_code == -1) ? 1: rs->first.op_code;
-      std::vector<reservation_station_t*>::iterator fu = std::find(scoreboard[op_code].begin(), scoreboard[op_code].end(), static_cast<reservation_station_t*>(0));
+    if (!rs.second && rs.first.src_reg_ready[0] && rs.first.src_reg_ready[1]) {
+      int32_t op_code = (rs.first.op_code == -1) ? 1: rs.first.op_code;
+      std::vector<int32_t>::iterator fu = std::find(scoreboard[op_code].begin(), scoreboard[op_code].end(), -1);
       if (fu != scoreboard[op_code].end()) {
-        *fu = &(rs->first);
-        rs->second = true;
-        std::cerr << "SCHEDULED " << rs->first.dest_reg_tag << std::endl;
+        *fu = qe->first;
+        rs.second = true;
+        std::cerr << p_stats->cycle_count << " SCHEDULED " << (rs.first.dest_reg_tag + 1) << std::endl;
       }
     }
   }
 }
 
-static void execute()
+static void execute(proc_stats_t* p_stats)
 {
-  std::vector<std::pair<uint32_t, reservation_station_t*> > waiting_instructions;
-  for (uint32_t fu = 0; fu < FUNCTIONAL_UNIT_RANGE; ++fu) {
-    for (std::vector<reservation_station_t*>::iterator i = scoreboard[fu].begin(); i != scoreboard[fu].end(); ++i) {
-      if (*i != 0) {
-        waiting_instructions.push_back(std::make_pair(fu, *i));
+  std::map<uint32_t, std::pair<uint32_t, reservation_station_t*> > waiting_instructions;
+  for (uint32_t op_code = 0; op_code < FUNCTIONAL_UNIT_RANGE; ++op_code) {
+    for (std::vector<int32_t>::iterator i = scoreboard[op_code].begin(); i != scoreboard[op_code].end(); ++i) {
+      if (*i >= 0) {
+        uint32_t tag = static_cast<uint32_t>(*i);
+        reservation_station_t* rs = &scheduling_queue[tag].first;
+        waiting_instructions.insert(std::make_pair(tag, std::make_pair(op_code, rs)));
       }
     }
   }
 
-  if (waiting_instructions.size() > 0) {
-    std::vector<std::pair<uint32_t, reservation_station_t*> >::iterator w = waiting_instructions.begin();
-    for (std::vector<result_bus_t>::iterator cdb = result_buses.begin(); cdb != result_buses.end(); ++cdb) {
+  std::map<uint32_t, std::pair<uint32_t, reservation_station_t*> >::iterator w = waiting_instructions.begin();
+  std::vector<result_bus_t>::iterator cdb = result_buses.begin();
+
+  while ((cdb != result_buses.end()) && (w != waiting_instructions.end())) {
+    if (((w->second.second)->dest_reg < 0) || !cdb->busy) {
+      uint32_t op_code = (w->second).first;
+      reservation_station_t* r = (w->second).second;
+
       if (!cdb->busy) {
-        uint32_t fu = w->first;
-        reservation_station_t* r = w->second;
-
-        if (r->dest_reg >= 0) {
-          cdb->busy = true;
-          cdb->tag = r->dest_reg_tag;
-          cdb->reg = r->dest_reg;
-          std::cout << r->dest_reg_tag << " " << r->dest_reg << std::endl;
-        }
-
-        for (std::vector<std::pair<reservation_station_t, bool> >::iterator rs = scheduling_queue.begin(); rs != scheduling_queue.end(); ++rs) {
-          if (rs->first == *r) {
-            scheduling_queue.erase(rs);
-            break;
-          }
-        }
-
-        std::vector<reservation_station_t*>::iterator it = std::find(scoreboard[fu].begin(), scoreboard[fu].end(), r);
-        if (it != scoreboard[fu].end()) {
-          *it = 0;
-        }
-
-        ++w;
+        cdb->busy = true;
+        cdb->tag = r->dest_reg_tag;
+        cdb->reg = r->dest_reg;
+        ++cdb;
       }
+
+      std::cerr << p_stats->cycle_count << " EXECUTED " << (r->dest_reg_tag + 1) << std::endl;
+
+      std::vector<int32_t>::iterator fu = std::find(scoreboard[op_code].begin(), scoreboard[op_code].end(), static_cast<int32_t>(r->dest_reg_tag));
+      *fu = -1;
+
+      std::map<uint32_t, std::pair<reservation_station_t, bool> >::iterator qe = scheduling_queue.find(r->dest_reg_tag);
+      scheduling_queue.erase(qe);
+
+      ++w;
+    }
+    else if (cdb->busy) {
+      ++cdb;
     }
   }
 }
 
-static void state_update()
+static void state_update(proc_stats_t* p_stats)
 {
   for (std::vector<result_bus_t>::iterator cdb = result_buses.begin(); cdb != result_buses.end(); ++cdb) {
     if (cdb->busy && (cdb->tag = reg_file[cdb->reg].second)) {
       reg_file[cdb->reg].first = true;
       cdb->busy = false;
-      std::cout << "STATE UPDATE " << cdb->tag << std::endl;
+      std::cerr << p_stats->cycle_count << " STATE UPDATE " << cdb->tag << std::endl;
     }
   }
 }
@@ -220,19 +225,21 @@ static void state_update()
  */
 void run_proc(proc_stats_t* p_stats)
 {
+  std::cerr << "CYCLE OPERATION INSTRUCTION" << std::endl;
+
   while (!done_fetching || (scheduling_queue.size() > 0)) {
 
-    state_update();
+    ++(p_stats->cycle_count);
 
-    execute();
+    state_update(p_stats);
 
-    schedule();
+    execute(p_stats);
 
-    dispatch();
+    schedule(p_stats);
+
+    dispatch(p_stats);
 
     fetch(p_stats);
-
-    ++(p_stats->cycle_count);
 
   }
 
