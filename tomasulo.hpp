@@ -41,7 +41,7 @@ class TomasuloSimulator {
 public:
   TomasuloSimulator();
 
-  TomasuloSimulator(const uint64_t, const uint64_t, const uint64_t, const uint64_t, const uint64_t);
+  TomasuloSimulator(const uint64_t, const uint64_t[NUM_FU_TYPES], const uint64_t);
 
   TomasuloSimulator(const TomasuloSimulator& ts);
 

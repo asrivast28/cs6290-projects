@@ -17,26 +17,21 @@ TomasuloSimulator::TomasuloSimulator(
 
 TomasuloSimulator::TomasuloSimulator(
   const uint64_t r,
-  const uint64_t k0,
-  const uint64_t k1,
-  const uint64_t k2,
+  const uint64_t k[NUM_FU_TYPES],
   const uint64_t f
 ) : m_dispatchQueue(),
   m_resultBuses(r),
-  m_schedulingQueueCapacity(2 * (k0 + k1 + k2)),
+  m_schedulingQueueCapacity(0),
   m_fetchRate(f),
   m_dispatchQueueSize(0),
   m_firedInstruction(0),
   m_doneFetching(false)
 {
-  for (uint64_t i = 0; i < k0; ++i) {
-    m_scoreboard[0].push_back(-1);
-  }
-  for (uint64_t i = 0; i < k1; ++i) {
-    m_scoreboard[1].push_back(-1);
-  }
-  for (uint64_t i = 0; i < k2; ++i) {
-    m_scoreboard[2].push_back(-1);
+  for (uint64_t i = 0; i < NUM_FU_TYPES; ++i) {
+    m_schedulingQueueCapacity += 2 * k[i];
+    for (uint64_t j = 0; j < k[i]; ++j) {
+      m_scoreboard[i].push_back(-1);
+    }
   }
 
   for (uint64_t i = 0; i < NUM_REGISTERS; ++i) {

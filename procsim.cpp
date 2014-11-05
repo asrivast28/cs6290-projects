@@ -18,7 +18,8 @@ TomasuloSimulator ts;
  */
 void setup_proc(uint64_t r, uint64_t k0, uint64_t k1, uint64_t k2, uint64_t f) 
 {
-  ts = TomasuloSimulator(r, k0, k1, k2, f);
+  uint64_t k[] = {k0, k1, k2};
+  ts = TomasuloSimulator(r, k, f);
 }
 
 /**
