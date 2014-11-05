@@ -42,9 +42,9 @@ void run_proc(proc_stats_t* p_stats)
 void complete_proc(proc_stats_t *p_stats) 
 {
   ts.printInstructionCycles();
-  float float_cycle_count = static_cast<float>(p_stats->cycle_count);
+  double cycle_count_double = static_cast<double>(p_stats->cycle_count);
   p_stats->retired_instruction = ts.retiredInstruction();
-  p_stats->avg_inst_retired = ts.retiredInstruction() / float_cycle_count; 
-  p_stats->avg_inst_fired = ts.firedInstruction() / float_cycle_count; 
-  p_stats->avg_disp_size = ts.dispatchQueueSize() / float_cycle_count;
+  p_stats->avg_inst_retired = ts.retiredInstruction() / cycle_count_double; 
+  p_stats->avg_inst_fired = ts.firedInstruction() / cycle_count_double; 
+  p_stats->avg_disp_size = ts.dispatchQueueSize() / cycle_count_double;
 }

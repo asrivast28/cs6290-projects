@@ -4,7 +4,7 @@
 #include <iostream>
 
 // set this to 1 for printing out what happens in each cycle to stderr
-#define DEBUG_LOG 1
+#define DEBUG_LOG 0
 
 TomasuloSimulator::TomasuloSimulator(
 ) : m_schedulingQueue(),
