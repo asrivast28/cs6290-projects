@@ -1,10 +1,12 @@
 #include "procsim.hpp"
 
+#include <array>
 #include <map>
 #include <queue>
 #include <vector>
 
 #define NUM_REGISTERS 128
+#define NUM_STAGES 5
 #define NUM_FU_TYPES 3
 
 enum schedule_status_t {
@@ -47,6 +49,8 @@ public:
 
   void simulateProcessor(proc_stats_t* const);
 
+  void printInstructionCycles() const;
+
   unsigned long dispatchQueueSize() const { return m_dispatchQueueSize; }
 
   unsigned long firedInstruction() const { return m_firedInstruction; }
@@ -69,18 +73,27 @@ private:
 private:
   std::map<uint32_t, reservation_station_t> m_schedulingQueue;
 
-  std::pair<bool, uint32_t> m_regFile[NUM_REGISTERS];
-  std::vector<int32_t> m_scoreboard[NUM_FU_TYPES];
+  std::vector<std::array<unsigned long, NUM_STAGES> > m_instructionCycleLog;
+
+  std::vector<std::pair<uint32_t, reservation_station_t*> > m_waitingInstructions;
+
+  std::vector<result_bus_t> m_resultBuses;
+
+  std::array<std::vector<int32_t>, NUM_FU_TYPES> m_scoreboard;
+
+  std::array<std::pair<bool, uint32_t>, NUM_REGISTERS> m_regFile;
 
   std::queue<proc_inst_t> m_dispatchQueue;
-  std::vector<result_bus_t> m_resultBuses;
 
   uint64_t m_schedulingQueueCapacity;
   uint64_t m_fetchRate;
+  uint64_t m_reservedSlots;
 
   unsigned long m_dispatchQueueSize;
   unsigned long m_firedInstruction;
   unsigned long m_retiredInstruction;
+
+  uint32_t m_counter;
 
   bool m_doneFetching;
 };

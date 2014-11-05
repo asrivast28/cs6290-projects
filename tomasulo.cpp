@@ -7,13 +7,20 @@
 #define DEBUG_LOG 1
 
 TomasuloSimulator::TomasuloSimulator(
-) : m_dispatchQueue(),
+) : m_schedulingQueue(),
+  m_instructionCycleLog(0),
+  m_waitingInstructions(0),
   m_resultBuses(0),
+  m_scoreboard(),
+  m_regFile(),
+  m_dispatchQueue(),
   m_schedulingQueueCapacity(0),
   m_fetchRate(0),
+  m_reservedSlots(0),
   m_dispatchQueueSize(0),
   m_firedInstruction(0),
   m_retiredInstruction(0),
+  m_counter(0),
   m_doneFetching(true)
 {
 }
@@ -22,12 +29,19 @@ TomasuloSimulator::TomasuloSimulator(
   const uint64_t r,
   const uint64_t k[NUM_FU_TYPES],
   const uint64_t f
-) : m_dispatchQueue(),
+) : m_schedulingQueue(),
+  m_instructionCycleLog(0),
+  m_waitingInstructions(0),
   m_resultBuses(r),
+  m_scoreboard(),
+  m_regFile(),
+  m_dispatchQueue(),
   m_schedulingQueueCapacity(0),
   m_fetchRate(f),
+  m_reservedSlots(0),
   m_dispatchQueueSize(0),
   m_firedInstruction(0),
+  m_counter(0),
   m_doneFetching(false)
 {
   for (uint64_t i = 0; i < NUM_FU_TYPES; ++i) {
@@ -46,13 +60,20 @@ TomasuloSimulator::TomasuloSimulator(
   const TomasuloSimulator& ts
 )
 {
-  m_dispatchQueue = ts.m_dispatchQueue;
+  m_schedulingQueue = ts.m_schedulingQueue;
+  m_instructionCycleLog = ts.m_instructionCycleLog;
+  m_waitingInstructions = ts.m_waitingInstructions;
   m_resultBuses = ts.m_resultBuses;
+  m_scoreboard = ts.m_scoreboard;
+  m_regFile = ts.m_regFile;
+  m_dispatchQueue = ts.m_dispatchQueue;
   m_schedulingQueueCapacity = ts.m_schedulingQueueCapacity,
   m_fetchRate = ts.m_fetchRate;
+  m_reservedSlots = ts.m_reservedSlots;
   m_dispatchQueueSize = ts.m_dispatchQueueSize;
   m_firedInstruction = ts.m_firedInstruction;
   m_retiredInstruction = ts.m_retiredInstruction;
+  m_counter = ts.m_counter;
   m_doneFetching = ts.m_doneFetching;
 
   for (uint64_t i = 0; i < NUM_FU_TYPES; ++i) {
@@ -70,12 +91,15 @@ TomasuloSimulator::fetch(
 )
 {
   if (!firstHalf) {
-    static uint32_t counter = 0;
     for (uint64_t f = 0; f < m_fetchRate; ++f) {
       proc_inst_t p_inst;
       if (read_instruction(&p_inst)) {
-        p_inst.tag = counter++;
+        m_instructionCycleLog.push_back(std::array<unsigned long, NUM_STAGES>());
+        p_inst.tag = m_counter++;
+        m_instructionCycleLog[p_inst.tag].fill(0);
         m_dispatchQueue.push(p_inst);
+        m_instructionCycleLog[p_inst.tag][0] = p_stats->cycle_count;
+        m_instructionCycleLog[p_inst.tag][1] = (p_stats->cycle_count + 1);
 #if DEBUG_LOG
         std::cerr << p_stats->cycle_count << "\tFETCHED\t" << (p_inst.tag + 1) << std::endl;
 #endif
@@ -99,12 +123,11 @@ TomasuloSimulator::dispatch(
   const bool firstHalf
 )
 {
-  static uint64_t reserved_slots = 0;
   if (firstHalf) {
-    reserved_slots = std::min(m_schedulingQueueCapacity - m_schedulingQueue.size(), m_dispatchQueue.size());
+    m_reservedSlots = std::min(m_schedulingQueueCapacity - m_schedulingQueue.size(), m_dispatchQueue.size());
   }
   else {
-    while ((reserved_slots > 0) && (m_dispatchQueue.size() > 0)) { 
+    while ((m_reservedSlots > 0) && (m_dispatchQueue.size() > 0)) { 
       reservation_station_t rs;
       const proc_inst_t& p_inst = m_dispatchQueue.front();
 
@@ -127,12 +150,13 @@ TomasuloSimulator::dispatch(
       rs.clock_stamp = p_stats->cycle_count;
 
       m_schedulingQueue.insert(std::make_pair(rs.dest_reg_tag, rs));
+      m_instructionCycleLog[p_inst.tag][2] = (p_stats->cycle_count + 1);
 #if DEBUG_LOG
       std::cerr << p_stats->cycle_count << "\tDISPATCHED\t" << (p_inst.tag + 1) << std::endl;
 #endif
       m_dispatchQueue.pop();
 
-      --reserved_slots;
+      --m_reservedSlots;
     }
   }
 }
@@ -156,6 +180,7 @@ TomasuloSimulator::schedule(
           *fu = qe->first;
           rs.status = SCHEDULED;
           rs.clock_stamp = p_stats->cycle_count;
+          m_instructionCycleLog[rs.dest_reg_tag][3] = (p_stats->cycle_count + 1);
 #if DEBUG_LOG
           std::cerr << p_stats->cycle_count << "\tSCHEDULED\t" << (rs.dest_reg_tag + 1) << std::endl;
 #endif
@@ -184,9 +209,7 @@ TomasuloSimulator::execute(
 )
 {
   if (firstHalf) {
-    static std::vector<std::pair<uint32_t, reservation_station_t*> > waiting_instructions;
-
-    std::map<uint32_t, std::pair<uint32_t, reservation_station_t*> > executed_instructions;
+    std::map<uint32_t, std::pair<uint32_t, reservation_station_t*> > executedInstructions;
     for (uint32_t op_code = 0; op_code < NUM_FU_TYPES; ++op_code) {
       for (std::vector<int32_t>::iterator i = m_scoreboard[op_code].begin(); i != m_scoreboard[op_code].end(); ++i) {
         if (*i >= 0) {
@@ -198,17 +221,17 @@ TomasuloSimulator::execute(
 #if DEBUG_LOG
             std::cerr << p_stats->cycle_count << "\tEXECUTED\t" << (tag + 1) << std::endl;
 #endif
-            executed_instructions.insert(std::make_pair(tag, std::make_pair(op_code, rs)));
+            executedInstructions.insert(std::make_pair(tag, std::make_pair(op_code, rs)));
           }
         }
       }
     }
-    for (std::map<uint32_t, std::pair<uint32_t, reservation_station_t*> >::const_iterator ex = executed_instructions.begin(); ex != executed_instructions.end(); ++ex) {
-      waiting_instructions.push_back(ex->second);
+    for (std::map<uint32_t, std::pair<uint32_t, reservation_station_t*> >::const_iterator ex = executedInstructions.begin(); ex != executedInstructions.end(); ++ex) {
+      m_waitingInstructions.push_back(ex->second);
     }
 
-    std::vector<std::pair<uint32_t, reservation_station_t*> >::iterator w = waiting_instructions.begin();
-    for (std::vector<result_bus_t>::iterator cdb = m_resultBuses.begin(); (cdb != m_resultBuses.end()) && (w != waiting_instructions.end()); ++cdb) {
+    std::vector<std::pair<uint32_t, reservation_station_t*> >::iterator w = m_waitingInstructions.begin();
+    for (std::vector<result_bus_t>::iterator cdb = m_resultBuses.begin(); (cdb != m_resultBuses.end()) && (w != m_waitingInstructions.end()); ++cdb) {
       uint32_t op_code = w->first;
       reservation_station_t* r = w->second;
 
@@ -228,7 +251,7 @@ TomasuloSimulator::execute(
       m_schedulingQueue[r->dest_reg_tag].status = COMPLETED;
       m_schedulingQueue[r->dest_reg_tag].clock_stamp = p_stats->cycle_count;
 
-      w = waiting_instructions.erase(w);
+      w = m_waitingInstructions.erase(w);
     }
   }
 }
@@ -243,6 +266,7 @@ TomasuloSimulator::stateUpdate(
     std::map<uint32_t, reservation_station_t>::iterator qe = m_schedulingQueue.begin();
     while (qe != m_schedulingQueue.end()) {
       if (qe->second.clock_stamp < p_stats->cycle_count && qe->second.status == COMPLETED) {
+        m_instructionCycleLog[qe->first][4] = p_stats->cycle_count;
 #if DEBUG_LOG
         std::cerr << p_stats->cycle_count << "\tSTATE UPDATE\t" << (qe->first + 1) << std::endl;
 #endif
@@ -288,4 +312,17 @@ TomasuloSimulator::simulateProcessor(
     } while (firstHalf);
 
   }
+}
+
+void
+TomasuloSimulator::printInstructionCycles(
+) const
+{
+  std::cout << "INST\tFETCH\tDISP\tSCHED\tEXEC\tSTATE" << std::endl;
+  uint64_t instCount = 1;
+  for (std::vector<std::array<unsigned long, NUM_STAGES> >::const_iterator inst = m_instructionCycleLog.begin(); inst != m_instructionCycleLog.end(); ++inst, ++instCount) {
+    const std::array<unsigned long, NUM_STAGES>& instCycle = *inst;
+    std::cout << instCount << '\t' << instCycle[0] << '\t' << instCycle[1] << '\t' << instCycle[2] << '\t' << instCycle[3] << '\t' << instCycle[4] << std::endl;
+  }
+  std::cout << std::endl;
 }
