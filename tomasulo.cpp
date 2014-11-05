@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <iostream>
 
+// set this to 1 for printing out what happens in each cycle to stderr
+#define DEBUG_LOG 1
+
 TomasuloSimulator::TomasuloSimulator(
 ) : m_dispatchQueue(),
   m_resultBuses(0),
@@ -73,7 +76,9 @@ TomasuloSimulator::fetch(
       if (read_instruction(&p_inst)) {
         p_inst.tag = counter++;
         m_dispatchQueue.push(p_inst);
-        std::cerr << p_stats->cycle_count << " FETCHED " << (p_inst.tag + 1) << std::endl;
+#if DEBUG_LOG
+        std::cerr << p_stats->cycle_count << "\tFETCHED\t" << (p_inst.tag + 1) << std::endl;
+#endif
       }
       else {
         m_doneFetching = true;
@@ -122,7 +127,9 @@ TomasuloSimulator::dispatch(
       rs.clock_stamp = p_stats->cycle_count;
 
       m_schedulingQueue.insert(std::make_pair(rs.dest_reg_tag, rs));
-      std::cerr << p_stats->cycle_count << " DISPATCHED " << (p_inst.tag + 1) << std::endl;
+#if DEBUG_LOG
+      std::cerr << p_stats->cycle_count << "\tDISPATCHED\t" << (p_inst.tag + 1) << std::endl;
+#endif
       m_dispatchQueue.pop();
 
       --reserved_slots;
@@ -149,7 +156,9 @@ TomasuloSimulator::schedule(
           *fu = qe->first;
           rs.status = SCHEDULED;
           rs.clock_stamp = p_stats->cycle_count;
-          std::cerr << p_stats->cycle_count << " SCHEDULED " << (rs.dest_reg_tag + 1) << std::endl;
+#if DEBUG_LOG
+          std::cerr << p_stats->cycle_count << "\tSCHEDULED\t" << (rs.dest_reg_tag + 1) << std::endl;
+#endif
           m_firedInstruction += 1;
         }
       }
@@ -186,7 +195,9 @@ TomasuloSimulator::execute(
           if (rs->status == SCHEDULED) {
             rs->status = EXECUTED;
             rs->clock_stamp = p_stats->cycle_count;
-            std::cerr << p_stats->cycle_count << " EXECUTED " << (tag + 1) << std::endl;
+#if DEBUG_LOG
+            std::cerr << p_stats->cycle_count << "\tEXECUTED\t" << (tag + 1) << std::endl;
+#endif
             executed_instructions.insert(std::make_pair(tag, std::make_pair(op_code, rs)));
           }
         }
@@ -232,7 +243,9 @@ TomasuloSimulator::stateUpdate(
     std::map<uint32_t, reservation_station_t>::iterator qe = m_schedulingQueue.begin();
     while (qe != m_schedulingQueue.end()) {
       if (qe->second.clock_stamp < p_stats->cycle_count && qe->second.status == COMPLETED) {
-        std::cerr << p_stats->cycle_count << " STATE UPDATE " << (qe->first + 1) << std::endl;
+#if DEBUG_LOG
+        std::cerr << p_stats->cycle_count << "\tSTATE UPDATE\t" << (qe->first + 1) << std::endl;
+#endif
         m_schedulingQueue.erase(qe++);
         ++m_retiredInstruction;
       }
@@ -248,7 +261,9 @@ TomasuloSimulator::simulateProcessor(
   proc_stats_t* const p_stats
 )
 {
-  std::cerr << "CYCLE OPERATION INSTRUCTION" << std::endl;
+#if DEBUG_LOG
+  std::cerr << "CYCLE\tOPERATION\tINSTRUCTION" << std::endl;
+#endif
 
   while (!done()) {
 
