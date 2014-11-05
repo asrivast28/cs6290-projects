@@ -3,10 +3,10 @@ CXXFLAGS := -g -Wall -std=c++0x -lm
 CXX=g++
 SRC=tomasulo.cpp procsim.cpp procsim_driver.cpp
 PROCSIM=./procsim
-R=2
-J=3
+R=8
+J=1
 K=2
-L=1
+L=3
 F=4
 
 build:
