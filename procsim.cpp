@@ -4,6 +4,7 @@
 
 #include <cinttypes>
 
+// Object of Tomasulo Simulator class.
 TomasuloSimulator ts;
 
 /**
