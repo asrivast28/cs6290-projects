@@ -26,7 +26,10 @@ void MESI_protocol::dump (void)
 void MESI_protocol::process_cache_request (Mreq *request)
 {
 	switch (state) {
-
+    case MESI_CACHE_I:  do_cache_I (request); break;
+    case MESI_CACHE_S: do_cache_S (request); break;
+    case MESI_CACHE_E:  do_cache_M (request); break;
+    case MESI_CACHE_M:  do_cache_M (request); break;
     default:
         fatal_error ("Invalid Cache State for MESI Protocol\n");
     }
@@ -35,8 +38,10 @@ void MESI_protocol::process_cache_request (Mreq *request)
 void MESI_protocol::process_snoop_request (Mreq *request)
 {
 	switch (state) {
-
-
+    case MESI_CACHE_I:  do_snoop_I (request); break;
+    case MESI_CACHE_S: do_snoop_S (request); break;
+    case MESI_CACHE_E:  do_snoop_M (request); break;
+    case MESI_CACHE_M:  do_snoop_M (request); break;
     default:
     	fatal_error ("Invalid Cache State for MESI Protocol\n");
     }

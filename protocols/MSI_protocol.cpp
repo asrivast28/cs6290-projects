@@ -26,7 +26,9 @@ void MSI_protocol::dump (void)
 void MSI_protocol::process_cache_request (Mreq *request)
 {
 	switch (state) {
-
+    case MSI_CACHE_I:  do_cache_I (request); break;
+    case MSI_CACHE_S: do_cache_S (request); break;
+    case MSI_CACHE_M:  do_cache_M (request); break;
     default:
         fatal_error ("Invalid Cache State for MSI Protocol\n");
     }
@@ -35,7 +37,9 @@ void MSI_protocol::process_cache_request (Mreq *request)
 void MSI_protocol::process_snoop_request (Mreq *request)
 {
 	switch (state) {
-
+    case MSI_CACHE_I:  do_snoop_I (request); break;
+    case MSI_CACHE_S: do_snoop_S (request); break;
+    case MSI_CACHE_M:  do_snoop_M (request); break;
     default:
     	fatal_error ("Invalid Cache State for MSI Protocol\n");
     }

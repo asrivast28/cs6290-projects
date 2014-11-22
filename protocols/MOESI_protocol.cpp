@@ -26,7 +26,11 @@ void MOESI_protocol::dump (void)
 void MOESI_protocol::process_cache_request (Mreq *request)
 {
 	switch (state) {
-
+    case MOESI_CACHE_I:  do_cache_I (request); break;
+    case MOESI_CACHE_S: do_cache_S (request); break;
+    case MOESI_CACHE_E:  do_cache_M (request); break;
+    case MOESI_CACHE_O:  do_cache_O (request); break;
+    case MOESI_CACHE_M:  do_cache_M (request); break;
     default:
         fatal_error ("Invalid Cache State for MOESI Protocol\n");
     }
@@ -35,7 +39,11 @@ void MOESI_protocol::process_cache_request (Mreq *request)
 void MOESI_protocol::process_snoop_request (Mreq *request)
 {
 	switch (state) {
-
+    case MOESI_CACHE_I:  do_snoop_I (request); break;
+    case MOESI_CACHE_S: do_snoop_S (request); break;
+    case MOESI_CACHE_E:  do_snoop_M (request); break;
+    case MOESI_CACHE_O:  do_snoop_O (request); break;
+    case MOESI_CACHE_M:  do_snoop_M (request); break;
     default:
     	fatal_error ("Invalid Cache State for MOESI Protocol\n");
     }
