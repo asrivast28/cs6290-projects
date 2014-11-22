@@ -47,30 +47,54 @@ void MSI_protocol::process_snoop_request (Mreq *request)
 
 inline void MSI_protocol::do_cache_I (Mreq *request)
 {
-
+  switch (request->msg) {
+    default:
+      request->print_msg (my_table->moduleID, "ERROR");
+      fatal_error ("Client: I state shouldn't see this message\n");
+  }
 }
 
 inline void MSI_protocol::do_cache_S (Mreq *request)
 {
-
+  switch (request->msg) {
+    default:
+      request->print_msg (my_table->moduleID, "ERROR");
+      fatal_error ("Client: S state shouldn't see this message\n");
+  }
 }
 
 inline void MSI_protocol::do_cache_M (Mreq *request)
 {
-
+  switch (request->msg) {
+    default:
+      request->print_msg (my_table->moduleID, "ERROR");
+      fatal_error ("Client: M state shouldn't see this message\n");
+  }
 }
 
 inline void MSI_protocol::do_snoop_I (Mreq *request)
 {
-
+  switch (request->msg) {
+    default:
+      request->print_msg (my_table->moduleID, "ERROR");
+      fatal_error ("Client: I state shouldn't see this message\n");
+  }
 }
 
 inline void MSI_protocol::do_snoop_S (Mreq *request)
 {
-
+  switch (request->msg) {
+    default:
+      request->print_msg (my_table->moduleID, "ERROR");
+      fatal_error ("Client: S state shouldn't see this message\n");
+  }
 }
 
 inline void MSI_protocol::do_snoop_M (Mreq *request)
 {
-
+  switch (request->msg) {
+    default:
+      request->print_msg (my_table->moduleID, "ERROR");
+      fatal_error ("Client: M state shouldn't see this message\n");
+  }
 }
