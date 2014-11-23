@@ -31,7 +31,7 @@ void MOSI_protocol::process_cache_request (Mreq *request)
     case MOSI_CACHE_O:  do_cache_O (request); break;
     case MOSI_CACHE_M:  do_cache_M (request); break;
     default:
-        fatal_error ("Invalid Cache State for MOSI Protocol\n");
+      fatal_error ("MOSI_protocol->state not valid?\n");
     }
 }
 
@@ -43,7 +43,7 @@ void MOSI_protocol::process_snoop_request (Mreq *request)
     case MOSI_CACHE_O:  do_snoop_O (request); break;
     case MOSI_CACHE_M:  do_snoop_M (request); break;
     default:
-    	fatal_error ("Invalid Cache State for MOSI Protocol\n");
+    	fatal_error ("MOSI_protocol->state not valid?\n");
     }
 }
 
