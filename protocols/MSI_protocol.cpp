@@ -224,7 +224,6 @@ inline void MSI_protocol::do_snoop_M (Mreq *request)
     	 * S. When we send the DATA it will go on the bus the next cycle and the memory
        * will see it and cancel its lookup for the DATA.
     	 */
-      set_shared_line();
       send_DATA_on_bus(request->addr, request->src_mid);
       state = MSI_CACHE_S;
       break;
@@ -235,7 +234,6 @@ inline void MSI_protocol::do_snoop_M (Mreq *request)
     	 * it will go on the bus the next cycle and the memory will see it and cancel
     	 * its lookup for the DATA.
     	 */
-      set_shared_line();
       send_DATA_on_bus(request->addr, request->src_mid);
       state = MSI_CACHE_I;
       break;
