@@ -31,7 +31,7 @@ void MESI_protocol::process_cache_request (Mreq *request)
     case MESI_CACHE_I:  do_cache_I (request); break;
     case MESI_CACHE_IS: do_cache_IS_IM (request); break;
     case MESI_CACHE_S: do_cache_S (request); break;
-    case MESI_CACHE_E:  do_cache_M (request); break;
+    case MESI_CACHE_E:  do_cache_E (request); break;
     case MESI_CACHE_IM: do_cache_IS_IM (request); break;
     case MESI_CACHE_M:  do_cache_M (request); break;
     default:
@@ -45,7 +45,7 @@ void MESI_protocol::process_snoop_request (Mreq *request)
     case MESI_CACHE_I:  do_snoop_I (request); break;
     case MESI_CACHE_IS: do_snoop_IS (request); break;
     case MESI_CACHE_S: do_snoop_S (request); break;
-    case MESI_CACHE_E:  do_snoop_M (request); break;
+    case MESI_CACHE_E:  do_snoop_E (request); break;
     case MESI_CACHE_IM: do_snoop_IM (request); break;
     case MESI_CACHE_M:  do_snoop_M (request); break;
     default:
@@ -123,9 +123,15 @@ inline void MESI_protocol::do_cache_E (Mreq *request)
 {
   switch (request->msg) {
     case LOAD:
+      // Send data back to the processor to finish the request
+      send_DATA_to_proc(request->addr);
       break;
     case STORE:
+      // Send data back to the processor to finish the request
+      send_DATA_to_proc(request->addr);
+      // Silently upgrade to M
       state = MESI_CACHE_M;
+      Sim->silent_upgrades++;
       break;
     default:
       request->print_msg (my_table->moduleID, "ERROR");
@@ -215,10 +221,12 @@ inline void MESI_protocol::do_snoop_E (Mreq *request)
 {
   switch (request->msg) {
     case GETS:
+      set_shared_line();
       send_DATA_on_bus(request->addr, request->src_mid);
       state = MESI_CACHE_S;
       break;
     case GETM:
+      set_shared_line();
       send_DATA_on_bus(request->addr, request->src_mid);
       state = MESI_CACHE_I;
       break;
@@ -285,4 +293,3 @@ inline void MESI_protocol::do_snoop_M (Mreq *request)
       fatal_error ("Client: M state shouldn't see this message\n");
   }
 }
-
