@@ -205,6 +205,7 @@ inline void MESI_protocol::do_snoop_S (Mreq *request)
 {
   switch (request->msg) {
     case GETS:
+      set_shared_line();
       break;
     case GETM:
       state = MESI_CACHE_I;
