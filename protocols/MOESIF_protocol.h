@@ -10,11 +10,13 @@
 /** Cache states.  */
 typedef enum {
     MOESIF_CACHE_I = 1,
+    MOESIF_CACHE_IS,
     MOESIF_CACHE_S,
     MOESIF_CACHE_E,
-    MOESIF_CACHE_O,
-    MOESIF_CACHE_M,
     MOESIF_CACHE_F,
+    MOESIF_CACHE_O,
+    MOESIF_CACHE_IM,
+    MOESIF_CACHE_M
 } MOESIF_cache_state_t;
 
 class MOESIF_protocol : public Protocol {
@@ -28,18 +30,21 @@ public:
     void process_snoop_request (Mreq *request);
     void dump (void);
 
-    inline void do_cache_F (Mreq *request);
     inline void do_cache_I (Mreq *request);
     inline void do_cache_S (Mreq *request);
+    inline void do_cache_IS_IM (Mreq *request);
     inline void do_cache_E (Mreq *request);
+    inline void do_cache_F (Mreq *request);
     inline void do_cache_O (Mreq *request);
     inline void do_cache_M (Mreq *request);
 
-    inline void do_snoop_F (Mreq *request);
     inline void do_snoop_I (Mreq *request);
+    inline void do_snoop_IS (Mreq *request);
     inline void do_snoop_S (Mreq *request);
     inline void do_snoop_E (Mreq *request);
+    inline void do_snoop_F (Mreq *request);
     inline void do_snoop_O (Mreq *request);
+    inline void do_snoop_IM (Mreq *request);
     inline void do_snoop_M (Mreq *request);
 };
 
