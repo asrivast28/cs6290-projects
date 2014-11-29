@@ -31,7 +31,7 @@ void MOSI_protocol::process_cache_request (Mreq *request)
     case MOSI_CACHE_I:  do_cache_I (request); break;
     case MOSI_CACHE_IS: do_cache_IS_IM (request); break;
     case MOSI_CACHE_S: do_cache_S (request); break;
-    case MOSI_CACHE_O:  do_cache_S (request); break;
+    case MOSI_CACHE_O:  do_cache_O (request); break;
     case MOSI_CACHE_IM: do_cache_IS_IM (request); break;
     case MOSI_CACHE_M:  do_cache_M (request); break;
     default:
@@ -122,6 +122,14 @@ inline void MOSI_protocol::do_cache_S (Mreq *request)
 inline void MOSI_protocol::do_cache_O (Mreq *request)
 {
   switch (request->msg) {
+    case LOAD:
+      send_DATA_to_proc(request->addr);
+      break;
+    case STORE:
+      send_GETM(request->addr);
+      state = MOSI_CACHE_IM;
+      Sim->cache_misses++;
+      break;
     default:
       request->print_msg (my_table->moduleID, "ERROR");
       fatal_error ("Client: O state shouldn't see this message\n");

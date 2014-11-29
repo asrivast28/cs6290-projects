@@ -185,7 +185,7 @@ inline void MESI_protocol::do_snoop_IS (Mreq *request)
       /**
        * IS state meant that the block had sent GETS and was waiting on DATA.
        * Now that Data is received we can send the DATA to the processor and finish
-       * the transition to S.
+       * the transition to S or E.
        */
       send_DATA_to_proc(request->addr);
       if (get_shared_line()) {
