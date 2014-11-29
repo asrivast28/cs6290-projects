@@ -21,7 +21,7 @@ MOSI_protocol::~MOSI_protocol ()
 
 void MOSI_protocol::dump (void)
 {
-    const char *block_states[7] = {"X","I","IS","S","O","IM","M"};
+    const char *block_states[8] = {"X","I","IS","S","O","IM","OM","M"};
     fprintf (stderr, "MOSI_protocol - state: %s\n", block_states[state]);
 }
 
@@ -33,6 +33,7 @@ void MOSI_protocol::process_cache_request (Mreq *request)
     case MOSI_CACHE_S: do_cache_S (request); break;
     case MOSI_CACHE_O:  do_cache_O (request); break;
     case MOSI_CACHE_IM: do_cache_IS_IM (request); break;
+    case MOSI_CACHE_OM: do_cache_IS_IM (request); break;
     case MOSI_CACHE_M:  do_cache_M (request); break;
     default:
       fatal_error ("MOSI_protocol->state not valid?\n");
@@ -47,6 +48,7 @@ void MOSI_protocol::process_snoop_request (Mreq *request)
     case MOSI_CACHE_S: do_snoop_S (request); break;
     case MOSI_CACHE_O:  do_snoop_O (request); break;
     case MOSI_CACHE_IM: do_snoop_IM (request); break;
+    case MOSI_CACHE_OM: do_snoop_OM (request); break;
     case MOSI_CACHE_M:  do_snoop_M (request); break;
     default:
     	fatal_error ("MOSI_protocol->state not valid?\n");
@@ -127,7 +129,7 @@ inline void MOSI_protocol::do_cache_O (Mreq *request)
       break;
     case STORE:
       send_GETM(request->addr);
-      state = MOSI_CACHE_IM;
+      state = MOSI_CACHE_OM;
       Sim->cache_misses++;
       break;
     default:
@@ -236,6 +238,31 @@ inline void MOSI_protocol::do_snoop_IM (Mreq *request)
        * While in IM we will see our own GETS or GETM on the bus. We should just
        * ignore it and wait for DATA to show up.
        */
+      break;
+    case DATA:
+      /**
+       * IM state meant that the block had sent GETM and was waiting on DATA.
+       * Now that Data is received we can send the DATA to the processor and finish
+       * the transition to M.
+       */
+      send_DATA_to_proc(request->addr);
+      state = MOSI_CACHE_M;
+      break;
+    default:
+      request->print_msg (my_table->moduleID, "ERROR");
+      fatal_error ("Client: IM state shouldn't see this message\n");
+	}
+}
+
+inline void MOSI_protocol::do_snoop_OM (Mreq *request)
+{
+	switch (request->msg) {
+    case GETS:
+    case GETM:
+      if (!get_shared_line()) {
+        set_shared_line();
+        send_DATA_on_bus(request->addr, request->src_mid);
+      }
       break;
     case DATA:
       /**

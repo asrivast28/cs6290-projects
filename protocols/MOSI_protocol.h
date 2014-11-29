@@ -14,6 +14,7 @@ typedef enum {
     MOSI_CACHE_S,
     MOSI_CACHE_O,
     MOSI_CACHE_IM,
+    MOSI_CACHE_OM,
     MOSI_CACHE_M
 } MOSI_cache_state_t;
 
@@ -39,6 +40,7 @@ public:
     inline void do_snoop_S (Mreq *request);
     inline void do_snoop_O (Mreq *request);
     inline void do_snoop_IM (Mreq *request);
+    inline void do_snoop_OM (Mreq *request);
     inline void do_snoop_M (Mreq *request);
 };
 
