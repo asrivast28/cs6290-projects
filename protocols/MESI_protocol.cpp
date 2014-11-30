@@ -21,7 +21,7 @@ MESI_protocol::~MESI_protocol ()
 
 void MESI_protocol::dump (void)
 {
-    const char *block_states[7] = {"X","I","IS","S","E","IM","M"};
+    const char *block_states[8] = {"X","I","IS","S","E","IM","SM","M"};
     fprintf (stderr, "MESI_protocol - state: %s\n", block_states[state]);
 }
 
@@ -33,6 +33,7 @@ void MESI_protocol::process_cache_request (Mreq *request)
     case MESI_CACHE_S: do_cache_S (request); break;
     case MESI_CACHE_E:  do_cache_E (request); break;
     case MESI_CACHE_IM: do_cache_IS_IM (request); break;
+    case MESI_CACHE_SM: do_cache_IS_IM (request); break;
     case MESI_CACHE_M:  do_cache_M (request); break;
     default:
       fatal_error ("MESI_protocol->state not valid?\n");
@@ -47,6 +48,7 @@ void MESI_protocol::process_snoop_request (Mreq *request)
     case MESI_CACHE_S: do_snoop_S (request); break;
     case MESI_CACHE_E:  do_snoop_E (request); break;
     case MESI_CACHE_IM: do_snoop_IM (request); break;
+    case MESI_CACHE_SM: do_snoop_SM (request); break;
     case MESI_CACHE_M:  do_snoop_M (request); break;
     default:
       fatal_error ("MESI_protocol->state not valid?\n");
@@ -109,7 +111,7 @@ inline void MESI_protocol::do_cache_S (Mreq *request)
       // Line up the GETM in the Bus' queue
       send_GETM(request->addr);
       // Set the state to IM
-      state = MESI_CACHE_IM;
+      state = MESI_CACHE_SM;
       // This is also a write miss
       Sim->cache_misses++;
       break;
@@ -241,6 +243,33 @@ inline void MESI_protocol::do_snoop_IM (Mreq *request)
 {
 	switch (request->msg) {
     case GETS:
+    case GETM:
+      /**
+       * While in IM we will see our own GETS or GETM on the bus. We should just
+       * ignore it and wait for DATA to show up.
+       */
+      break;
+    case DATA:
+      /**
+       * IM state meant that the block had sent GETM and was waiting on DATA.
+       * Now that Data is received we can send the DATA to the processor and finish
+       * the transition to M.
+       */
+      send_DATA_to_proc(request->addr);
+      state = MESI_CACHE_M;
+      break;
+    default:
+      request->print_msg (my_table->moduleID, "ERROR");
+      fatal_error ("Client: IM state shouldn't see this message\n");
+	}
+}
+
+inline void MESI_protocol::do_snoop_SM (Mreq *request)
+{
+	switch (request->msg) {
+    case GETS:
+      set_shared_line();
+      break;
     case GETM:
       /**
        * While in IM we will see our own GETS or GETM on the bus. We should just

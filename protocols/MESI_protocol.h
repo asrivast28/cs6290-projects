@@ -14,6 +14,7 @@ typedef enum {
     MESI_CACHE_S,
     MESI_CACHE_E,
     MESI_CACHE_IM,
+    MESI_CACHE_SM,
     MESI_CACHE_M
 } MESI_cache_state_t;
 
@@ -39,6 +40,7 @@ public:
     inline void do_snoop_S (Mreq *request);
     inline void do_snoop_E (Mreq *request);
     inline void do_snoop_IM (Mreq *request);
+    inline void do_snoop_SM (Mreq *request);
     inline void do_snoop_M (Mreq *request);
 };
 
