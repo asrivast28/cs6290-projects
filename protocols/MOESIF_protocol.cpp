@@ -150,6 +150,7 @@ inline void MOESIF_protocol::do_cache_F (Mreq *request)
     case LOAD:
       // Send data back to the processor to finish the request
       send_DATA_to_proc(request->addr);
+      break;
     case STORE:
       send_GETM(request->addr);
       state = MOESIF_CACHE_IM;
