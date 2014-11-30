@@ -20,7 +20,7 @@ MOESIF_protocol::~MOESIF_protocol ()
 
 void MOESIF_protocol::dump (void)
 {
-    const char *block_states[10] = {"X","I","IS","S","E","F","O","IM","OM","M"};
+    const char *block_states[11] = {"X","I","IS","S","E","F","O","IM","FM","OM","M"};
     fprintf (stderr, "MOESIF_protocol - state: %s\n", block_states[state]);
 }
 
@@ -34,6 +34,7 @@ void MOESIF_protocol::process_cache_request (Mreq *request)
     case MOESIF_CACHE_F:  do_cache_F (request); break;
     case MOESIF_CACHE_O:  do_cache_O (request); break;
     case MOESIF_CACHE_IM: do_cache_IS_IM (request); break;
+    case MOESIF_CACHE_FM: do_cache_IS_IM (request); break;
     case MOESIF_CACHE_OM: do_cache_IS_IM (request); break;
     case MOESIF_CACHE_M:  do_cache_M (request); break;
     default:
@@ -43,6 +44,7 @@ void MOESIF_protocol::process_cache_request (Mreq *request)
 
 void MOESIF_protocol::process_snoop_request (Mreq *request)
 {
+  // dump();
 	switch (state) {
     case MOESIF_CACHE_I:  do_snoop_I (request); break;
     case MOESIF_CACHE_IS: do_snoop_IS (request); break;
@@ -51,6 +53,7 @@ void MOESIF_protocol::process_snoop_request (Mreq *request)
     case MOESIF_CACHE_F:  do_snoop_F (request); break;
     case MOESIF_CACHE_O:  do_snoop_O (request); break;
     case MOESIF_CACHE_IM: do_snoop_IM (request); break;
+    case MOESIF_CACHE_FM: do_snoop_OM (request); break;
     case MOESIF_CACHE_OM: do_snoop_OM (request); break;
     case MOESIF_CACHE_M:  do_snoop_M (request); break;
     default:
@@ -153,7 +156,7 @@ inline void MOESIF_protocol::do_cache_F (Mreq *request)
       break;
     case STORE:
       send_GETM(request->addr);
-      state = MOESIF_CACHE_IM;
+      state = MOESIF_CACHE_FM;
       Sim->cache_misses++;
       break;
     default:

@@ -16,6 +16,7 @@ typedef enum {
     MOESIF_CACHE_F,
     MOESIF_CACHE_O,
     MOESIF_CACHE_IM,
+    MOESIF_CACHE_FM,
     MOESIF_CACHE_OM,
     MOESIF_CACHE_M
 } MOESIF_cache_state_t;
