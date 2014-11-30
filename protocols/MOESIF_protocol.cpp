@@ -28,14 +28,14 @@ void MOESIF_protocol::process_cache_request (Mreq *request)
 {
 	switch (state) {
     case MOESIF_CACHE_I:  do_cache_I (request); break;
-    case MOESIF_CACHE_IS: do_cache_IS_IM (request); break;
+    case MOESIF_CACHE_IS: do_cache_wait (request); break;
     case MOESIF_CACHE_S: do_cache_S (request); break;
     case MOESIF_CACHE_E:  do_cache_E (request); break;
-    case MOESIF_CACHE_F:  do_cache_F (request); break;
-    case MOESIF_CACHE_O:  do_cache_O (request); break;
-    case MOESIF_CACHE_IM: do_cache_IS_IM (request); break;
-    case MOESIF_CACHE_SM: do_cache_IS_IM (request); break;
-    case MOESIF_CACHE_OFM: do_cache_IS_IM (request); break;
+    case MOESIF_CACHE_F:  do_cache_OF (request); break;
+    case MOESIF_CACHE_O:  do_cache_OF (request); break;
+    case MOESIF_CACHE_IM: do_cache_wait (request); break;
+    case MOESIF_CACHE_SM: do_cache_wait (request); break;
+    case MOESIF_CACHE_OFM: do_cache_wait (request); break;
     case MOESIF_CACHE_M:  do_cache_M (request); break;
     default:
       fatal_error ("MOESIF_protocol->state not valid?\n");
@@ -50,8 +50,8 @@ void MOESIF_protocol::process_snoop_request (Mreq *request)
     case MOESIF_CACHE_IS: do_snoop_IS (request); break;
     case MOESIF_CACHE_S: do_snoop_S (request); break;
     case MOESIF_CACHE_E:  do_snoop_E (request); break;
-    case MOESIF_CACHE_F:  do_snoop_F (request); break;
-    case MOESIF_CACHE_O:  do_snoop_O (request); break;
+    case MOESIF_CACHE_F:  do_snoop_OF (request); break;
+    case MOESIF_CACHE_O:  do_snoop_OF (request); break;
     case MOESIF_CACHE_IM: do_snoop_IM (request); break;
     case MOESIF_CACHE_SM: do_snoop_SM (request); break;
     case MOESIF_CACHE_OFM: do_snoop_OFM (request); break;
@@ -87,13 +87,13 @@ inline void MOESIF_protocol::do_cache_I (Mreq *request)
   }
 }
 
-inline void MOESIF_protocol::do_cache_IS_IM (Mreq *request)
+inline void MOESIF_protocol::do_cache_wait (Mreq *request)
 {
 	switch (request->msg) {
     case LOAD:
     case STORE:
       /**
-       * If the block is in either IS or IM state, that means it sent out a GET message
+       * If we are here, it means that the processor sent out a GET message
        * and is waiting on DATA.  Therefore the processor should be waiting
        * on a pending request. Therefore we should not be getting any requests from
        * the processor.
@@ -102,7 +102,7 @@ inline void MOESIF_protocol::do_cache_IS_IM (Mreq *request)
       fatal_error("Should only have one outstanding request per processor!");
     default:
       request->print_msg (my_table->moduleID, "ERROR");
-      fatal_error ("Client: IS or IM state shouldn't see this message\n");
+      fatal_error ("Client: waiting state shouldn't see this message\n");
 	}
 }
 
@@ -147,7 +147,7 @@ inline void MOESIF_protocol::do_cache_E (Mreq *request)
   }
 }
 
-inline void MOESIF_protocol::do_cache_F (Mreq *request)
+inline void MOESIF_protocol::do_cache_OF (Mreq *request)
 {
   switch (request->msg) {
     case LOAD:
@@ -155,30 +155,16 @@ inline void MOESIF_protocol::do_cache_F (Mreq *request)
       send_DATA_to_proc(request->addr);
       break;
     case STORE:
+      // Line up the GETM in the Bus' queue
       send_GETM(request->addr);
+      // Set the state to OFM
       state = MOESIF_CACHE_OFM;
+      // This is a cache miss
       Sim->cache_misses++;
       break;
     default:
       request->print_msg (my_table->moduleID, "ERROR");
       fatal_error ("Client: F state shouldn't see this message\n");
-  }
-}
-
-inline void MOESIF_protocol::do_cache_O (Mreq *request)
-{
-  switch (request->msg) {
-    case LOAD:
-      send_DATA_to_proc(request->addr);
-      break;
-    case STORE:
-      send_GETM(request->addr);
-      state = MOESIF_CACHE_OFM;
-      Sim->cache_misses++;
-      break;
-    default:
-      request->print_msg (my_table->moduleID, "ERROR");
-      fatal_error ("Client: O state shouldn't see this message\n");
   }
 }
 
@@ -248,6 +234,7 @@ inline void MOESIF_protocol::do_snoop_S (Mreq *request)
 {
   switch (request->msg) {
     case GETS:
+      // set shared line so that any other processor doesn't transition to E
       set_shared_line();
       break;
     case GETM:
@@ -265,13 +252,17 @@ inline void MOESIF_protocol::do_snoop_E (Mreq *request)
 {
   switch (request->msg) {
     case GETS:
+      // Transfer data on bus if any other processors want it
       set_shared_line();
       send_DATA_on_bus(request->addr, request->src_mid);
+      // Transition to F state
       state = MOESIF_CACHE_F;
       break;
     case GETM:
+      // Transfer data on bus if any other processors want it
       set_shared_line();
       send_DATA_on_bus(request->addr, request->src_mid);
+      // Transition to I state
       state = MOESIF_CACHE_I;
       break;
     default:
@@ -280,10 +271,12 @@ inline void MOESIF_protocol::do_snoop_E (Mreq *request)
   }
 }
 
-inline void MOESIF_protocol::do_snoop_F (Mreq *request)
+inline void MOESIF_protocol::do_snoop_OF (Mreq *request)
 {
   switch (request->msg) {
     case GETS:
+      // Send data to other processor
+      // Stay in the same state
       set_shared_line();
       send_DATA_on_bus(request->addr, request->src_mid);
       break;
@@ -294,25 +287,7 @@ inline void MOESIF_protocol::do_snoop_F (Mreq *request)
       break;
     default:
       request->print_msg (my_table->moduleID, "ERROR");
-      fatal_error ("Client: F state shouldn't see this message\n");
-  }
-}
-
-inline void MOESIF_protocol::do_snoop_O (Mreq *request)
-{
-  switch (request->msg) {
-    case GETS:
-      set_shared_line();
-      send_DATA_on_bus(request->addr, request->src_mid);
-      break;
-    case GETM:
-      set_shared_line();
-      send_DATA_on_bus(request->addr, request->src_mid);
-      state = MOESIF_CACHE_I;
-      break;
-    default:
-      request->print_msg (my_table->moduleID, "ERROR");
-      fatal_error ("Client: O state shouldn't see this message\n");
+      fatal_error ("Client: O or F state shouldn't see this message\n");
   }
 }
 
@@ -346,6 +321,10 @@ inline void MOESIF_protocol::do_snoop_OFM (Mreq *request)
 	switch (request->msg) {
     case GETS:
     case GETM:
+      /**
+       * We are transitioning to M state but we still have clean data
+       * which we can transfer to other processor.
+       */
       if (!get_shared_line()) {
         set_shared_line();
         send_DATA_on_bus(request->addr, request->src_mid);
