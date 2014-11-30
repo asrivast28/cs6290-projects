@@ -29,13 +29,13 @@ void MOESI_protocol::process_cache_request (Mreq *request)
 {
 	switch (state) {
     case MOESI_CACHE_I:  do_cache_I (request); break;
-    case MOESI_CACHE_IS: do_cache_IS_IM (request); break;
+    case MOESI_CACHE_IS: do_cache_wait (request); break;
     case MOESI_CACHE_S: do_cache_S (request); break;
     case MOESI_CACHE_E:  do_cache_E (request); break;
     case MOESI_CACHE_O:  do_cache_O (request); break;
-    case MOESI_CACHE_IM: do_cache_IS_IM (request); break;
-    case MOESI_CACHE_SM: do_cache_IS_IM (request); break;
-    case MOESI_CACHE_OM: do_cache_IS_IM (request); break;
+    case MOESI_CACHE_IM: do_cache_wait (request); break;
+    case MOESI_CACHE_SM: do_cache_wait (request); break;
+    case MOESI_CACHE_OM: do_cache_wait (request); break;
     case MOESI_CACHE_M:  do_cache_M (request); break;
     default:
       fatal_error ("MOESI_protocol->state not valid?\n");
@@ -85,13 +85,13 @@ inline void MOESI_protocol::do_cache_I (Mreq *request)
   }
 }
 
-inline void MOESI_protocol::do_cache_IS_IM (Mreq *request)
+inline void MOESI_protocol::do_cache_wait (Mreq *request)
 {
 	switch (request->msg) {
     case LOAD:
     case STORE:
       /**
-       * If the block is in either IS or IM state, that means it sent out a GET message
+       * If we are here, it means that the processor sent out a GET message
        * and is waiting on DATA.  Therefore the processor should be waiting
        * on a pending request. Therefore we should not be getting any requests from
        * the processor.
@@ -152,8 +152,11 @@ inline void MOESI_protocol::do_cache_O (Mreq *request)
       send_DATA_to_proc(request->addr);
       break;
     case STORE:
+      // Line up the GETM in the Bus' queue
       send_GETM(request->addr);
+      // Set the state to OFM
       state = MOESI_CACHE_OM;
+      // This is a cache miss
       Sim->cache_misses++;
       break;
     default:
@@ -245,13 +248,17 @@ inline void MOESI_protocol::do_snoop_E (Mreq *request)
 {
   switch (request->msg) {
     case GETS:
+      // Transfer data on bus if any other processor wants it
       set_shared_line();
       send_DATA_on_bus(request->addr, request->src_mid);
+      // Transition to S because now the data isn't exclusive
       state = MOESI_CACHE_S;
       break;
     case GETM:
+      // Transfer data on bus if any other processor wants it
       set_shared_line();
       send_DATA_on_bus(request->addr, request->src_mid);
+      // Invalidate data 
       state = MOESI_CACHE_I;
       break;
     default:
@@ -264,10 +271,13 @@ inline void MOESI_protocol::do_snoop_O (Mreq *request)
 {
   switch (request->msg) {
     case GETS:
+      // Send data to other processor
+      // Stay in the same state
       set_shared_line();
       send_DATA_on_bus(request->addr, request->src_mid);
       break;
     case GETM:
+      // Send data to other processor and invalidate this processor's copy
       set_shared_line();
       send_DATA_on_bus(request->addr, request->src_mid);
       state = MOESI_CACHE_I;
@@ -311,13 +321,13 @@ inline void MOESI_protocol::do_snoop_SM (Mreq *request)
       break;
     case GETM:
       /**
-       * While in IM we will see our own GETS or GETM on the bus. We should just
+       * While in SM we will see our own GETS or GETM on the bus. We should just
        * ignore it and wait for DATA to show up.
        */
       break;
     case DATA:
       /**
-       * IM state meant that the block had sent GETM and was waiting on DATA.
+       * SM state meant that the block had sent GETM and was waiting on DATA.
        * Now that Data is received we can send the DATA to the processor and finish
        * the transition to M.
        */
@@ -342,7 +352,7 @@ inline void MOESI_protocol::do_snoop_OM (Mreq *request)
       break;
     case DATA:
       /**
-       * IM state meant that the block had sent GETM and was waiting on DATA.
+       * OM state meant that the block had sent GETM and was waiting on DATA.
        * Now that Data is received we can send the DATA to the processor and finish
        * the transition to M.
        */

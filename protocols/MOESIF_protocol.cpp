@@ -252,14 +252,14 @@ inline void MOESIF_protocol::do_snoop_E (Mreq *request)
 {
   switch (request->msg) {
     case GETS:
-      // Transfer data on bus if any other processors want it
+      // Transfer data on bus if any other processos wants it
       set_shared_line();
       send_DATA_on_bus(request->addr, request->src_mid);
       // Transition to F state
       state = MOESIF_CACHE_F;
       break;
     case GETM:
-      // Transfer data on bus if any other processors want it
+      // Transfer data on bus if any other processor wants it
       set_shared_line();
       send_DATA_on_bus(request->addr, request->src_mid);
       // Transition to I state
@@ -281,6 +281,7 @@ inline void MOESIF_protocol::do_snoop_OF (Mreq *request)
       send_DATA_on_bus(request->addr, request->src_mid);
       break;
     case GETM:
+      // Send data to other processor and invalidate this processor's copy
       set_shared_line();
       send_DATA_on_bus(request->addr, request->src_mid);
       state = MOESIF_CACHE_I;
@@ -353,13 +354,13 @@ inline void MOESIF_protocol::do_snoop_SM (Mreq *request)
       break;
     case GETM:
       /**
-       * While in IM we will see our own GETS or GETM on the bus. We should just
+       * While in SM we will see our own GETS or GETM on the bus. We should just
        * ignore it and wait for DATA to show up.
        */
       break;
     case DATA:
       /**
-       * IM state meant that the block had sent GETM and was waiting on DATA.
+       * SM state meant that the block had sent GETM and was waiting on DATA.
        * Now that Data is received we can send the DATA to the processor and finish
        * the transition to M.
        */

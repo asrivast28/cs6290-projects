@@ -32,7 +32,7 @@ public:
     void dump (void);
 
     inline void do_cache_I (Mreq *request);
-    inline void do_cache_IS_IM (Mreq *request);
+    inline void do_cache_wait (Mreq *request);
     inline void do_cache_S (Mreq *request);
     inline void do_cache_E (Mreq *request);
     inline void do_cache_O (Mreq *request);

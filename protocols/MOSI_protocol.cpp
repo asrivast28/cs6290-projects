@@ -29,11 +29,11 @@ void MOSI_protocol::process_cache_request (Mreq *request)
 {
 	switch (state) {
     case MOSI_CACHE_I:  do_cache_I (request); break;
-    case MOSI_CACHE_IS: do_cache_IS_IM (request); break;
+    case MOSI_CACHE_IS: do_cache_wait (request); break;
     case MOSI_CACHE_S: do_cache_S (request); break;
     case MOSI_CACHE_O:  do_cache_O (request); break;
-    case MOSI_CACHE_IM: do_cache_IS_IM (request); break;
-    case MOSI_CACHE_OM: do_cache_IS_IM (request); break;
+    case MOSI_CACHE_IM: do_cache_wait (request); break;
+    case MOSI_CACHE_OM: do_cache_wait (request); break;
     case MOSI_CACHE_M:  do_cache_M (request); break;
     default:
       fatal_error ("MOSI_protocol->state not valid?\n");
@@ -81,7 +81,7 @@ inline void MOSI_protocol::do_cache_I (Mreq *request)
   }
 }
 
-inline void MOSI_protocol::do_cache_IS_IM (Mreq *request)
+inline void MOSI_protocol::do_cache_wait (Mreq *request)
 {
 	switch (request->msg) {
     case LOAD:
@@ -125,11 +125,16 @@ inline void MOSI_protocol::do_cache_O (Mreq *request)
 {
   switch (request->msg) {
     case LOAD:
+      // Send data to other processor
+      // Stay in the same state
       send_DATA_to_proc(request->addr);
       break;
     case STORE:
+      // Line up the GETM in the Bus' queue
       send_GETM(request->addr);
+      // Set the state to OM
       state = MOSI_CACHE_OM;
+      // This is a cache miss
       Sim->cache_misses++;
       break;
     default:
@@ -215,10 +220,13 @@ inline void MOSI_protocol::do_snoop_O (Mreq *request)
 {
   switch (request->msg) {
     case GETS:
+      // Send data to other processor
+      // Stay in the same state
       set_shared_line();
       send_DATA_on_bus(request->addr, request->src_mid);
       break;
     case GETM:
+      // Send data to other processor and invalidate this processor's copy
       set_shared_line();
       send_DATA_on_bus(request->addr, request->src_mid);
       state = MOSI_CACHE_I;
@@ -266,7 +274,7 @@ inline void MOSI_protocol::do_snoop_OM (Mreq *request)
       break;
     case DATA:
       /**
-       * IM state meant that the block had sent GETM and was waiting on DATA.
+       * OM state meant that the block had sent GETM and was waiting on DATA.
        * Now that Data is received we can send the DATA to the processor and finish
        * the transition to M.
        */
