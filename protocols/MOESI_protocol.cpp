@@ -21,7 +21,7 @@ MOESI_protocol::~MOESI_protocol ()
 
 void MOESI_protocol::dump (void)
 {
-    const char *block_states[9] = {"X","I","IS","S","E","O","IM","OM","M"};
+    const char *block_states[10] = {"X","I","IS","S","E","O","IM","SM","OM","M"};
     fprintf (stderr, "MOESI_protocol - state: %s\n", block_states[state]);
 }
 
@@ -34,6 +34,7 @@ void MOESI_protocol::process_cache_request (Mreq *request)
     case MOESI_CACHE_E:  do_cache_E (request); break;
     case MOESI_CACHE_O:  do_cache_O (request); break;
     case MOESI_CACHE_IM: do_cache_IS_IM (request); break;
+    case MOESI_CACHE_SM: do_cache_IS_IM (request); break;
     case MOESI_CACHE_OM: do_cache_IS_IM (request); break;
     case MOESI_CACHE_M:  do_cache_M (request); break;
     default:
@@ -50,6 +51,7 @@ void MOESI_protocol::process_snoop_request (Mreq *request)
     case MOESI_CACHE_E:  do_snoop_E (request); break;
     case MOESI_CACHE_O:  do_snoop_O (request); break;
     case MOESI_CACHE_IM: do_snoop_IM (request); break;
+    case MOESI_CACHE_SM: do_snoop_SM (request); break;
     case MOESI_CACHE_OM: do_snoop_OM (request); break;
     case MOESI_CACHE_M:  do_snoop_M (request); break;
     default:
@@ -113,7 +115,7 @@ inline void MOESI_protocol::do_cache_S (Mreq *request)
       // Line up the GETM in the Bus' queue
       send_GETM(request->addr);
       // Set the state to IM
-      state = MOESI_CACHE_IM;
+      state = MOESI_CACHE_SM;
       // This is also a write miss
       Sim->cache_misses++;
       break;
@@ -280,6 +282,33 @@ inline void MOESI_protocol::do_snoop_IM (Mreq *request)
 {
 	switch (request->msg) {
     case GETS:
+    case GETM:
+      /**
+       * While in IM we will see our own GETS or GETM on the bus. We should just
+       * ignore it and wait for DATA to show up.
+       */
+      break;
+    case DATA:
+      /**
+       * IM state meant that the block had sent GETM and was waiting on DATA.
+       * Now that Data is received we can send the DATA to the processor and finish
+       * the transition to M.
+       */
+      send_DATA_to_proc(request->addr);
+      state = MOESI_CACHE_M;
+      break;
+    default:
+      request->print_msg (my_table->moduleID, "ERROR");
+      fatal_error ("Client: IM state shouldn't see this message\n");
+	}
+}
+
+inline void MOESI_protocol::do_snoop_SM (Mreq *request)
+{
+	switch (request->msg) {
+    case GETS:
+      set_shared_line();
+      break;
     case GETM:
       /**
        * While in IM we will see our own GETS or GETM on the bus. We should just
