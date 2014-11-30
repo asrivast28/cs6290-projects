@@ -20,7 +20,7 @@ MOESIF_protocol::~MOESIF_protocol ()
 
 void MOESIF_protocol::dump (void)
 {
-    const char *block_states[11] = {"X","I","IS","S","E","F","O","IM","FM","OM","M"};
+    const char *block_states[11] = {"X","I","IS","S","E","F","O","IM","SM","OFM","M"};
     fprintf (stderr, "MOESIF_protocol - state: %s\n", block_states[state]);
 }
 
@@ -34,8 +34,8 @@ void MOESIF_protocol::process_cache_request (Mreq *request)
     case MOESIF_CACHE_F:  do_cache_F (request); break;
     case MOESIF_CACHE_O:  do_cache_O (request); break;
     case MOESIF_CACHE_IM: do_cache_IS_IM (request); break;
-    case MOESIF_CACHE_FM: do_cache_IS_IM (request); break;
-    case MOESIF_CACHE_OM: do_cache_IS_IM (request); break;
+    case MOESIF_CACHE_SM: do_cache_IS_IM (request); break;
+    case MOESIF_CACHE_OFM: do_cache_IS_IM (request); break;
     case MOESIF_CACHE_M:  do_cache_M (request); break;
     default:
       fatal_error ("MOESIF_protocol->state not valid?\n");
@@ -53,8 +53,8 @@ void MOESIF_protocol::process_snoop_request (Mreq *request)
     case MOESIF_CACHE_F:  do_snoop_F (request); break;
     case MOESIF_CACHE_O:  do_snoop_O (request); break;
     case MOESIF_CACHE_IM: do_snoop_IM (request); break;
-    case MOESIF_CACHE_FM: do_snoop_OM (request); break;
-    case MOESIF_CACHE_OM: do_snoop_OM (request); break;
+    case MOESIF_CACHE_SM: do_snoop_SM (request); break;
+    case MOESIF_CACHE_OFM: do_snoop_OFM (request); break;
     case MOESIF_CACHE_M:  do_snoop_M (request); break;
     default:
     	fatal_error ("MOESIF_protocol->state not valid?\n");
@@ -156,7 +156,7 @@ inline void MOESIF_protocol::do_cache_F (Mreq *request)
       break;
     case STORE:
       send_GETM(request->addr);
-      state = MOESIF_CACHE_FM;
+      state = MOESIF_CACHE_OFM;
       Sim->cache_misses++;
       break;
     default:
@@ -173,7 +173,7 @@ inline void MOESIF_protocol::do_cache_O (Mreq *request)
       break;
     case STORE:
       send_GETM(request->addr);
-      state = MOESIF_CACHE_OM;
+      state = MOESIF_CACHE_OFM;
       Sim->cache_misses++;
       break;
     default:
@@ -341,7 +341,7 @@ inline void MOESIF_protocol::do_snoop_IM (Mreq *request)
 	}
 }
 
-inline void MOESIF_protocol::do_snoop_OM (Mreq *request)
+inline void MOESIF_protocol::do_snoop_OFM (Mreq *request)
 {
 	switch (request->msg) {
     case GETS:
@@ -350,6 +350,33 @@ inline void MOESIF_protocol::do_snoop_OM (Mreq *request)
         set_shared_line();
         send_DATA_on_bus(request->addr, request->src_mid);
       }
+      break;
+    case DATA:
+      /**
+       * IM state meant that the block had sent GETM and was waiting on DATA.
+       * Now that Data is received we can send the DATA to the processor and finish
+       * the transition to M.
+       */
+      send_DATA_to_proc(request->addr);
+      state = MOESIF_CACHE_M;
+      break;
+    default:
+      request->print_msg (my_table->moduleID, "ERROR");
+      fatal_error ("Client: IM state shouldn't see this message\n");
+	}
+}
+
+inline void MOESIF_protocol::do_snoop_SM (Mreq *request)
+{
+	switch (request->msg) {
+    case GETS:
+      set_shared_line();
+      break;
+    case GETM:
+      /**
+       * While in IM we will see our own GETS or GETM on the bus. We should just
+       * ignore it and wait for DATA to show up.
+       */
       break;
     case DATA:
       /**

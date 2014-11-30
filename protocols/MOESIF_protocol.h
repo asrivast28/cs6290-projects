@@ -16,8 +16,8 @@ typedef enum {
     MOESIF_CACHE_F,
     MOESIF_CACHE_O,
     MOESIF_CACHE_IM,
-    MOESIF_CACHE_FM,
-    MOESIF_CACHE_OM,
+    MOESIF_CACHE_SM,
+    MOESIF_CACHE_OFM,
     MOESIF_CACHE_M
 } MOESIF_cache_state_t;
 
@@ -47,7 +47,8 @@ public:
     inline void do_snoop_F (Mreq *request);
     inline void do_snoop_O (Mreq *request);
     inline void do_snoop_IM (Mreq *request);
-    inline void do_snoop_OM (Mreq *request);
+    inline void do_snoop_SM (Mreq *request);
+    inline void do_snoop_OFM (Mreq *request);
     inline void do_snoop_M (Mreq *request);
 };
 
